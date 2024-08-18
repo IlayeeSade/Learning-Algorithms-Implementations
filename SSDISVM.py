@@ -388,7 +388,6 @@ class SSDISVM:
         if is_ended:
             return
 
-        global red_positions, blue_positions
         position = (y, x)
         if position in self.red_positions:
             self.red_positions.remove(position)
