@@ -1,25 +1,17 @@
 # imports
 import numpy as np
 import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
 
 class SSDISVM:
   """
-  Support Vector Machine Classifier, with SMO implementation by Swissa Sade David Ilayee (SSDI)
+  Support Vector Machine Classifier, with SMO and more optimization algorithms by Swissa Sade David Ilayee (SSDI)
   """
 
-  def __init__(self, kernel_type='linear', C=1.0, tol=0.0001, max_iters=2000, eps=0.0001, gamma='scale', poly_degree=1):
-    kernel_functions = {
-      'linear': self.linear_kernel,
-      'poly': self.polynomial_kernel,
-      'rbf': self.rbf_kernel,
-      'sigmoid': self.sigmoid_kernel
-    }
-    # Ensure the kernel_type is valid
-    if kernel_type in kernel_functions:
-      self.kernel_type = kernel_functions[kernel_type]
-    else:
-      self.kernel_type = kernel_functions['linear']
+  def __init__(self, kernel_type='linear', C=1.0, tol=0.001, max_iters=2000, eps=0.001, gamma='scale', poly_degree=1):
+    self.kernel_type = kernel_type
     self.C = C
     self.tol = tol
     self.max_iters = max_iters
@@ -35,10 +27,13 @@ class SSDISVM:
     self.__A = None  # alphas
     self.__W = None  # weights
     self.__b = 0  # bias
+    # For grid
+    self.red_positions = []
+    self.blue_positions = []
 
   # Kernel Functions --START--
   @staticmethod
-  def linear_kernel(self, x1, x2):
+  def linear_kernel(x1, x2):
     """
     linear kernel function x1 @ x2.transpose()
     """
@@ -179,7 +174,7 @@ class SSDISVM:
     y_j = self.Y[j]
     alpha_i_old = self.__A[i]
     alpha_j_old = self.__A[j]
-    self.__Ei = self.__calc_error_a(i)
+    self._Ei = self.__calc_error_a(i)
     s = y_i * y_j
     l, h = self.__calc_bounds(i, j)
     eta = self.__calc_eta(self.X[i], self.X[j])
@@ -264,15 +259,30 @@ class SSDISVM:
   # SMO Algorithm --END--
   # Fit Method --START--
 
-  def fit(self, x, y, algo):
+  def fit(self, x = 'grid', y = 'grid', algo='smo_with_regularization', kernel_type = None):
     """
-        fit the model to the data
-        """
-    self.X = x
-    self.Y = y
+    fit the model to the data
+    """
+    kernel_functions = {
+      'linear': self.linear_kernel,
+      'poly': self.polynomial_kernel,
+      'rbf': self.rbf_kernel,
+      'sigmoid': self.sigmoid_kernel
+    }
+    if kernel_type in kernel_functions:
+      self.kernel_type = kernel_type
+    # Ensure the kernel_type is valid
+    if self.kernel_type in kernel_functions:
+      self.kernel_type = kernel_functions[self.kernel_type]
+    else:
+      self.kernel_type = kernel_functions['linear']
+    if x != 'grid':
+      if y != 'grid':
+        self.X = x
+        self.Y = y
     self.gammas = {  # Setting the gamma
-      'auto': 1 / x.shape[1],
-      'scale': 1 / (x.shape[1] * x.var().mean())
+      'auto': 1 / self.X.shape[1],
+      'scale': 1 / (self.X.shape[1] * self.X.var().mean())
     }
     if self.gamma not in self.gammas:
       self.gamma = self.gamma
@@ -322,5 +332,106 @@ class SSDISVM:
     """
     print(f'alphas: {self.__A}, weights: {self.__W}, bias: {self.__b}, gamma: {self.gamma}')
     print(f'C: {self.C}, tol: {self.tol}, max_iters: {self.max_iters}, eps: {self.eps}')
-    print(f'kernel_type: {self.kernel_type.__name__}, poly_degree: {self.poly_degree}')
+    print(f'kernel_type: #fix, poly_degree: {self.poly_degree}')
     print(f'Examples Variances: {self.X.var(axis=0)}, Examples Means: {self.X.mean(axis=0)}')
+
+  def load_grid(self):
+    red_array = np.array(self.red_positions)-10
+    blue_array = np.array(self.blue_positions)-10
+    print("Pink positions as a NumPy array:\n", red_array)
+    print("Yellow positions as a NumPy array:\n", blue_array)
+    self.X = np.concatenate([red_array, blue_array], axis=0)
+    self.Y = np.concatenate([-np.ones(red_array.shape[0]), np.ones(blue_array.shape[0])], axis=0)
+
+  def grid(self):
+    # Set up the grid with a focus on the middle
+    grid_size = 21  # Making it odd to have a clear center
+    center = grid_size // 2
+    grid = np.zeros((grid_size, grid_size))
+
+    # Flag to check if the process is ended
+    is_ended = False
+
+    # Function to draw the grid
+    def draw_grid():
+        if is_ended:
+            return
+
+        clear_output(wait=True)  # Clear the previous plot
+        fig, ax = plt.subplots(figsize=(10, 10))  # Increase figure size for better clarity
+
+        # Set up the ticks and grid
+        ticks = np.arange(-10, 11)
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        ax.set_xticklabels(ticks)
+        ax.set_yticklabels(ticks[::-1])  # Reverse y-axis labels
+        ax.grid(True, which='both', color='black', linestyle='-', linewidth=0.5)
+
+        ax.set_xlim(-10.5, 10.5)
+        ax.set_ylim(-10.5, 10.5)
+
+        # Plot X's for clicked positions
+        for pos in red_positions:
+            ax.text(pos[1] - center, center - pos[0], 'X', ha='center', va='center', color='tab:pink', fontsize=15)
+        for pos in blue_positions:
+            ax.text(pos[1] - center, center - pos[0], 'X', ha='center', va='center', color='yellow', fontsize=15)
+
+        plt.show()
+
+        # Display the widgets again after clearing the output
+        display(end_button)
+        display(grid_ui)
+
+    # Function to handle clicks
+    def on_click(x, y):
+        if is_ended:
+            return
+
+        global red_positions, blue_positions
+        position = (y, x)
+        if position in self.red_positions:
+            self.red_positions.remove(position)
+            self.blue_positions.append(position)
+        elif position in self.blue_positions:
+            self.blue_positions.remove(position)
+        else:
+            self.red_positions.append(position)
+        draw_grid()
+
+    # Function to end the process
+    def end_process(b):
+        global is_ended
+        is_ended = True
+        clear_output(wait=True)
+        plt.close('all')  # Close all open plots
+        print("Process ended. Final positions:")
+        self.load_grid()
+
+    # Create buttons for each cell in the grid
+    buttons = []
+    for y in range(grid_size):
+        button_row = []
+        for x in range(grid_size):
+            button = widgets.Button(description=f'({x-center},{center-y})',
+                                    layout=widgets.Layout(width='60px', height='40px'),
+                                    style={'font_size': '10px'})
+            button.on_click(lambda b, x=x, y=y: on_click(x, y))
+            button_row.append(button)
+        buttons.append(widgets.HBox(button_row))
+
+    # Create an "End Process" button
+    end_button = widgets.Button(description="End Process",
+                                layout=widgets.Layout(width='200px', height='50px'),
+                                style={'button_color': 'lightcoral'})
+    end_button.on_click(end_process)
+
+    # Display buttons in a grid layout, centered on (0,0)
+    grid_ui = widgets.VBox(buttons)
+
+    # Initial display of the end button and grid
+    display(end_button)
+    display(grid_ui)
+
+    # Initial draw of the grid
+    draw_grid()
