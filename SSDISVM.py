@@ -10,15 +10,14 @@ class SSDISVM:
   Support Vector Machine Classifier, with SMO and more optimization algorithms by Swissa Sade David Ilayee (SSDI)
   """
 
-  def __init__(self, kernel_type='linear', C=1.0, tol=0.001, max_iters=2000, eps=0.001, gamma='scale', poly_degree=1):
-    self.kernel_type = kernel_type
-    self.C = C
-    self.tol = tol
-    self.max_iters = max_iters
-    self.eps = eps
-    self.gamma = gamma
+  def __init__(self):
+    self.kernel_type = None
+    self.C = None
+    self.tol = None
+    self.eps = None
+    self.gamma = None
     self.gammas = None
-    self.poly_degree = poly_degree
+    self.poly_degree = None
     # Initialize for the fit method
     self.X = None  # x_examples
     self.Y = None  # y_examples
@@ -259,35 +258,14 @@ class SSDISVM:
   # SMO Algorithm --END--
   # Fit Method --START--
 
-  def fit(self, x = 'grid', y = 'grid', algo='smo_with_regularization', kernel_type = None):
+  def fit(self, algo='smo_with_regularization', x = 'grid', y = 'grid'):
     """
     fit the model to the data
     """
-    kernel_functions = {
-      'linear': self.linear_kernel,
-      'poly': self.polynomial_kernel,
-      'rbf': self.rbf_kernel,
-      'sigmoid': self.sigmoid_kernel
-    }
-    if kernel_type in kernel_functions:
-      self.kernel_type = kernel_type
-    # Ensure the kernel_type is valid
-    if self.kernel_type in kernel_functions:
-      self.kernel_type = kernel_functions[self.kernel_type]
-    else:
-      self.kernel_type = kernel_functions['linear']
     if x != 'grid':
       if y != 'grid':
         self.X = x
         self.Y = y
-    self.gammas = {  # Setting the gamma
-      'auto': 1 / self.X.shape[1],
-      'scale': 1 / (self.X.shape[1] * self.X.var().mean())
-    }
-    if self.gamma not in self.gammas:
-      self.gamma = self.gamma
-    else:
-      self.gamma = self.gammas[self.gamma]
     algorithms = {
       # 'simple_smo_with_regularization': self.simple_smo_with_regularization, # (Was Implemented, sucked ass)
       # 'simple_smo': self.simple_smo, # (Was Implemented, sucked ass)
@@ -335,6 +313,28 @@ class SSDISVM:
     print(f'kernel_type: #fix, poly_degree: {self.poly_degree}')
     print(f'Examples Variances: {self.X.var(axis=0)}, Examples Means: {self.X.mean(axis=0)}')
 
+  def loader(self, kernel_type='linear', C=1.0, tol=0.001, max_iters=2000, eps=0.001, gamma='scale', poly_degree=1):
+    kernel_functions = {
+      'linear': self.linear_kernel,
+      'poly': self.polynomial_kernel,
+      'rbf': self.rbf_kernel,
+      'sigmoid': self.sigmoid_kernel
+    }
+    self.kernel_type = kernel_functions[kernel_type]
+    self.C = C
+    self.tol = tol
+    self.max_iters = max_iters
+    self.eps = eps
+    self.gammas = {  # Setting the gamma
+      'auto': 1 / self.X.shape[1],
+      'scale': 1 / (self.X.shape[1] * self.X.var().mean())
+    }
+    if gamma not in self.gammas:
+      self.gamma = gamma
+    else:
+      self.gamma = self.gammas[gamma]
+    self.poly_degree = poly_degree
+
   def load_grid(self):
     red_array = np.array(self.red_positions)-10
     blue_array = np.array(self.blue_positions)-10
@@ -372,9 +372,9 @@ class SSDISVM:
         ax.set_ylim(-10.5, 10.5)
 
         # Plot X's for clicked positions
-        for pos in red_positions:
+        for pos in self.red_positions:
             ax.text(pos[1] - center, center - pos[0], 'X', ha='center', va='center', color='tab:pink', fontsize=15)
-        for pos in blue_positions:
+        for pos in self.blue_positions:
             ax.text(pos[1] - center, center - pos[0], 'X', ha='center', va='center', color='yellow', fontsize=15)
 
         plt.show()
@@ -400,7 +400,6 @@ class SSDISVM:
 
     # Function to end the process
     def end_process(b):
-        global is_ended
         is_ended = True
         clear_output(wait=True)
         plt.close('all')  # Close all open plots
